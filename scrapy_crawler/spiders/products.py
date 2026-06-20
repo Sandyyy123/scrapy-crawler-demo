@@ -8,15 +8,19 @@ Example product spider demonstrating production Scrapy patterns:
 Run:
     scrapy crawl products -O out/products.json
 """
+import re
+
 import scrapy
 from scrapy.loader import ItemLoader
-from itemloaders.processors import TakeFirst, MapCompose, Join
+from itemloaders.processors import TakeFirst, MapCompose
 
 from scrapy_crawler.items import ProductItem
 
 
 def clean_price(value: str) -> str:
-    return value.replace("$", "").replace(",", "").strip()
+    # Keep digits and decimal point only — currency-symbol agnostic (£, $, €).
+    match = re.search(r"[\d.,]+", value or "")
+    return match.group(0).replace(",", "") if match else ""
 
 
 class ProductsSpider(scrapy.Spider):
@@ -56,7 +60,7 @@ class ProductsSpider(scrapy.Spider):
             "availability",
             "p.availability::text",
             MapCompose(str.strip),
-            Join(),
+            lambda values: [v for v in values if v],  # drop blank text nodes
         )
         loader.add_css("rating", "p.star-rating::attr(class)",
                        MapCompose(lambda c: c.replace("star-rating", "").strip()))
